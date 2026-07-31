@@ -42,6 +42,19 @@ class _MainShellState extends State<MainShell> {
       // SafeArea wraps the body so content never overlaps the phone's
       // status bar (top) or system nav buttons (bottom) — confirmed
       // working correctly per our earlier discussion.
+      appBar: AppBar(
+        // Logo placeholder — shows the real Locua mark, not just text.
+        // Swap this asset later if the logo gets refined.
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/images/icon_512.png', height: 32),
+            const SizedBox(width: 10),
+            Text('LOCUA', style: Theme.of(context).textTheme.titleLarge),
+          ],
+        ),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,

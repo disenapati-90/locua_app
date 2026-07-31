@@ -1,0 +1,32 @@
+[
+  {
+    "word": "candid",
+    "theme": "Job Interview",
+    "storyEpisode": 1,
+    "sentence": "The interviewer asked for a candid answer, not a rehearsed one.",
+    "definition": "honest and direct, without pretense",
+    "synonyms": ["frank", "forthright"],
+    "antonyms": ["evasive", "guarded"],
+    "level": "easy"
+  },
+  {
+    "word": "meticulous",
+    "theme": "Job Interview",
+    "storyEpisode": 1,
+    "sentence": "Her meticulous preparation impressed the entire panel.",
+    "definition": "showing great attention to detail; very careful",
+    "synonyms": ["thorough", "precise"],
+    "antonyms": ["careless", "sloppy"],
+    "level": "medium"
+  },
+  {
+    "word": "ambiguous",
+    "theme": "Job Interview",
+    "storyEpisode": 2,
+    "sentence": "His ambiguous response left the interviewer unsure of his intent.",
+    "definition": "open to more than one interpretation; unclear",
+    "synonyms": ["vague", "equivocal"],
+    "antonyms": ["clear", "explicit"],
+    "level": "hard"
+  }
+]
