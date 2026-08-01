@@ -7,11 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'widgets/main_shell.dart';
+import 'services/storage_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // required before any async setup pre-runApp
+  await StorageService.init(); // opens Hive boxes before the app builds
   runApp(
-    // ChangeNotifierProvider makes ThemeProvider available to every widget
-    // below it in the tree, without passing it manually screen to screen.
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
       child: const LocuaApp(),
