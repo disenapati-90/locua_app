@@ -8,13 +8,18 @@ import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'widgets/main_shell.dart';
 import 'services/storage_service.dart';
+import 'package:provider/provider.dart';
+import 'providers/progress_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // required before any async setup pre-runApp
   await StorageService.init(); // opens Hive boxes before the app builds
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ProgressProvider()),
+      ],
       child: const LocuaApp(),
     ),
   );
