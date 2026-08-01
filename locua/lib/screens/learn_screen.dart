@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../models/word.dart';
 import '../services/word_service.dart';
 import 'package:flutter/gestures.dart';
+import '../services/tts_service.dart';
 
 class LearnScreen extends StatefulWidget {
   const LearnScreen({super.key});
@@ -95,6 +96,12 @@ class _LearnScreenState extends State<LearnScreen> {
                                 style: Theme.of(context).textTheme.bodyMedium),
                             Text('Antonyms: ${w.antonyms.join(", ")}',
                                 style: Theme.of(context).textTheme.bodyMedium),
+                                const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: () => TtsService.speak(w.word),
+                              icon: const Icon(Icons.volume_up, size: 18),
+                              label: const Text('Hear pronunciation'),
+                            ),
                           ],
                         ],
                       ),
