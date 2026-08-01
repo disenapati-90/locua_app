@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/word.dart';
 import '../services/word_service.dart';
 import '../providers/progress_provider.dart';
+import '../providers/nav_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -90,7 +91,8 @@ class HomeScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: () {
-                          // Will navigate to the Learn tab once that's built (later step)
+                          context.read<NavProvider>().setIndex(1); // jumps to Learn tab
+                        
                         },
                         child: const Text('Resume Story'),
                       ),

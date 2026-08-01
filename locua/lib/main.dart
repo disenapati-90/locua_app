@@ -10,6 +10,7 @@ import 'widgets/main_shell.dart';
 import 'services/storage_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/progress_provider.dart';
+import 'providers/nav_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // required before any async setup pre-runApp
@@ -19,6 +20,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => ProgressProvider()),
+        ChangeNotifierProvider(create: (_) => NavProvider()),
       ],
       child: const LocuaApp(),
     ),
