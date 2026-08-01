@@ -1,32 +1,15 @@
 [
-  {
-    "word": "candid",
-    "theme": "Job Interview",
-    "storyEpisode": 1,
-    "sentence": "The interviewer asked for a candid answer, not a rehearsed one.",
-    "definition": "honest and direct, without pretense",
-    "synonyms": ["frank", "forthright"],
-    "antonyms": ["evasive", "guarded"],
-    "level": "easy"
-  },
-  {
-    "word": "meticulous",
-    "theme": "Job Interview",
-    "storyEpisode": 1,
-    "sentence": "Her meticulous preparation impressed the entire panel.",
-    "definition": "showing great attention to detail; very careful",
-    "synonyms": ["thorough", "precise"],
-    "antonyms": ["careless", "sloppy"],
-    "level": "medium"
-  },
-  {
-    "word": "ambiguous",
-    "theme": "Job Interview",
-    "storyEpisode": 2,
-    "sentence": "His ambiguous response left the interviewer unsure of his intent.",
-    "definition": "open to more than one interpretation; unclear",
-    "synonyms": ["vague", "equivocal"],
-    "antonyms": ["clear", "explicit"],
-    "level": "hard"
-  }
+  {"word": "candid", "theme": "Job Interview", "storyEpisode": 1, "sentence": "The interviewer asked for a candid answer, not a rehearsed one.", "definition": "honest and direct, without pretense", "synonyms": ["frank", "forthright"], "antonyms": ["evasive", "guarded"], "level": "easy"},
+  {"word": "meticulous", "theme": "Job Interview", "storyEpisode": 1, "sentence": "Her meticulous preparation impressed the entire panel.", "definition": "showing great attention to detail; very careful", "synonyms": ["thorough", "precise"], "antonyms": ["careless", "sloppy"], "level": "medium"},
+  {"word": "ambiguous", "theme": "Job Interview", "storyEpisode": 2, "sentence": "His ambiguous response left the interviewer unsure of his intent.", "definition": "open to more than one interpretation; unclear", "synonyms": ["vague", "equivocal"], "antonyms": ["clear", "explicit"], "level": "hard"},
+  {"word": "perjury", "theme": "Courtroom Drama", "storyEpisode": 1, "sentence": "The witness was charged with perjury after admitting she had lied under oath.", "definition": "the offense of lying while under oath in a court of law", "synonyms": ["false testimony", "lying under oath"], "antonyms": ["honesty", "truthfulness"], "level": "hard"},
+  {"word": "culpable", "theme": "Courtroom Drama", "storyEpisode": 1, "sentence": "The prosecutor argued that the defendant was fully culpable for the fraud.", "definition": "deserving blame; responsible for wrongdoing", "synonyms": ["blameworthy", "guilty"], "antonyms": ["innocent", "blameless"], "level": "hard"},
+  {"word": "exculpatory", "theme": "Courtroom Drama", "storyEpisode": 1, "sentence": "New exculpatory evidence emerged just before the verdict was announced.", "definition": "tending to clear someone of blame or fault", "synonyms": ["vindicating", "clearing"], "antonyms": ["incriminating", "damning"], "level": "hard"},
+  {"word": "indict", "theme": "Courtroom Drama", "storyEpisode": 2, "sentence": "The grand jury voted to indict the company's former CEO.", "definition": "to formally charge someone with a crime", "synonyms": ["charge", "accuse"], "antonyms": ["exonerate", "acquit"], "level": "medium"},
+  {"word": "litigious", "theme": "Courtroom Drama", "storyEpisode": 2, "sentence": "Their notoriously litigious neighbor had sued three people on the street already.", "definition": "prone to taking legal disputes to court", "synonyms": ["contentious", "quarrelsome"], "antonyms": ["conciliatory", "agreeable"], "level": "hard"},
+  {"word": "equivocate", "theme": "Courtroom Drama", "storyEpisode": 2, "sentence": "Under cross-examination, the witness began to equivocate rather than answer directly.", "definition": "to use ambiguous language to avoid committing to a clear statement", "synonyms": ["hedge", "dodge"], "antonyms": ["clarify", "affirm"], "level": "hard"},
+  {"word": "obfuscate", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "The defense was accused of trying to obfuscate the timeline of events.", "definition": "to deliberately make something unclear or hard to understand", "synonyms": ["confuse", "muddle"], "antonyms": ["clarify", "illuminate"], "level": "hard"},
+  {"word": "remonstrate", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "The lawyer stood to remonstrate against the judge's sudden ruling.", "definition": "to protest or argue forcefully in objection to something", "synonyms": ["protest", "object"], "antonyms": ["comply", "acquiesce"], "level": "hard"},
+  {"word": "vindicate", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "The final ruling would either vindicate her or end her career.", "definition": "to clear someone of blame after they've been suspected or accused", "synonyms": ["exonerate", "absolve"], "antonyms": ["incriminate", "condemn"], "level": "hard"},
+  {"word": "acquiesce", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "Rather than fight the settlement further, the company chose to acquiesce.", "definition": "to accept or comply with something without protest", "synonyms": ["comply", "yield"], "antonyms": ["resist", "object"], "level": "hard"}
 ]
