@@ -34,4 +34,9 @@ class AdProvider extends ChangeNotifier {
     _adsShownThisSession = 0;
     notifyListeners();
   }
+  // Called when Remove Ads purchase completes (or is restored).
+  void setAdFree(bool value) {
+    isAdFree = value;
+    notifyListeners();
+  }
 }

@@ -12,10 +12,13 @@ import 'package:provider/provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/nav_provider.dart';
 import 'providers/ad_provider.dart';
+import 'services/iap_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // required before any async setup pre-runApp
   await StorageService.init(); // opens Hive boxes before the app builds
+  // Note: this needs a reference to AdProvider, so full wiring happens
+  // via a small helper after MultiProvider is built — see LocuaApp below.
   runApp(
     MultiProvider(
       providers: [
@@ -29,18 +32,33 @@ void main() async {
   );
 }
 
-class LocuaApp extends StatelessWidget {
+class LocuaApp extends StatefulWidget {
   const LocuaApp({super.key});
 
   @override
+  State<LocuaApp> createState() => _LocuaAppState();
+}
+
+class _LocuaAppState extends State<LocuaApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Listens for purchase completion and flips the isAdFree flag globally.
+    IapService.initialize(
+      onRemoveAdsPurchased: () {
+        context.read<AdProvider>().setAdFree(true);
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Watch the ThemeProvider so this widget rebuilds whenever the theme changes.
     final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp(
       title: 'Locua',
-      debugShowCheckedModeBanner: false, // hides the red "DEBUG" ribbon
-      theme: themeProvider.themeData, // pulls current theme live
+      debugShowCheckedModeBanner: false,
+      theme: themeProvider.themeData,
       home: const MainShell(),
     );
   }
