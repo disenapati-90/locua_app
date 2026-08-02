@@ -2,6 +2,8 @@
 // Real Word Detective screen: pulls only words that are DUE for review
 // today (per SRS scheduling in ProgressProvider), shows a riddle built
 // from synonyms/antonyms, and lets the user answer via multiple choice.
+// Also shows a styled banner ad every 5th answered question (capped at
+// 3 per session), per AdProvider's logic.
 
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -9,6 +11,8 @@ import 'package:provider/provider.dart';
 import '../models/word.dart';
 import '../services/word_service.dart';
 import '../providers/progress_provider.dart';
+import '../providers/ad_provider.dart';
+import '../widgets/native_banner_ad.dart';
 
 class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
@@ -24,6 +28,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   List<String> _choices = [];
   String? _selectedChoice;
   bool _answered = false;
+  bool _showAdNow = false;
 
   @override
   void initState() {
@@ -68,15 +73,20 @@ class _PracticeScreenState extends State<PracticeScreen> {
       progressProvider.markIncorrect(correctWord);
     }
 
+    final adProvider = context.read<AdProvider>();
+    final shouldShowAd = adProvider.registerAnsweredQuestion();
+
     setState(() {
       _selectedChoice = choice;
       _answered = true;
+      _showAdNow = shouldShowAd;
     });
   }
 
   void _nextQuestion() {
     setState(() {
       _currentIndex++;
+      _showAdNow = false; // clear ad flag before moving to next question
       if (_currentIndex < _dueWords.length) {
         _generateChoices();
       }
@@ -130,7 +140,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Answer choices
+
+          // ---- Banner ad slot (only appears when AdProvider says it's due) ----
+          if (_showAdNow) const NativeBannerAd(),
+
+          // ---- Answer choices ----
           ..._choices.map((choice) {
             final isSelected = _selectedChoice == choice;
             final isCorrectChoice = choice == currentWord.word;
@@ -155,6 +169,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
             );
           }),
+
           const Spacer(),
           if (_answered)
             ElevatedButton(
