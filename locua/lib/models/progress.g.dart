@@ -25,13 +25,15 @@ class ProgressAdapter extends TypeAdapter<Progress> {
       learned: fields[5] as bool,
       userMnemonic: fields[6] as String?,
       voiceNoteId: fields[7] as String?,
+      totalAttempts: fields[8] as int,
+      correctAttempts: fields[9] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, Progress obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.word)
       ..writeByte(1)
@@ -47,7 +49,11 @@ class ProgressAdapter extends TypeAdapter<Progress> {
       ..writeByte(6)
       ..write(obj.userMnemonic)
       ..writeByte(7)
-      ..write(obj.voiceNoteId);
+      ..write(obj.voiceNoteId)
+      ..writeByte(8)
+      ..write(obj.totalAttempts)
+      ..writeByte(9)
+      ..write(obj.correctAttempts);
   }
 
   @override

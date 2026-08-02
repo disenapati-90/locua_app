@@ -36,6 +36,12 @@ class Progress extends HiveObject {
   @HiveField(7)
   String? voiceNoteId; // reference to a saved voice recording, if any
 
+  @HiveField(8)
+  int totalAttempts;
+
+  @HiveField(9)
+  int correctAttempts;
+
   Progress({
     required this.word,
     this.lastReviewed,
@@ -45,11 +51,15 @@ class Progress extends HiveObject {
     this.learned = false,
     this.userMnemonic,
     this.voiceNoteId,
+    this.totalAttempts = 0,
+    this.correctAttempts = 0,
   });
 
   // Call this when the user answers correctly in Word Detective.
   // Interval grows: 1 -> 2 -> 5 -> 10 -> 20 days (caps at 20).
   void markCorrect() {
+    totalAttempts += 1;
+    correctAttempts += 1;
     correctStreak += 1;
     lastReviewed = DateTime.now();
     if (intervalDays == 1) {
@@ -68,6 +78,7 @@ class Progress extends HiveObject {
   // Call this when the user answers incorrectly. Resets the spacing —
   // the word needs to be seen again soon, not in weeks.
   void markIncorrect() {
+    totalAttempts += 1;
     correctStreak = 0;
     intervalDays = 1;
     lastReviewed = DateTime.now();

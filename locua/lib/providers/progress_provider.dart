@@ -1,8 +1,8 @@
 // progress_provider.dart
 // Central place that reads/writes Progress data from Hive, exposes
-// simple stats (streak, % complete, words learned), and — new for Day 7 —
-// figures out which words are actually DUE for review today, based on
-// real spaced-repetition scheduling (not just question count).
+// simple stats (streak, % complete, words learned, accuracy, weak words),
+// and figures out which words are actually DUE for review today, based
+// on real spaced-repetition scheduling (not just question count).
 
 import 'package:flutter/material.dart';
 import '../models/progress.dart';
@@ -30,6 +30,25 @@ class ProgressProvider extends ChangeNotifier {
     final fresh = Progress(word: word); // defaults: interval 1 day, streak 0
     box.add(fresh);
     return fresh;
+  }
+
+  // Overall accuracy across every attempt ever made, as a percentage.
+  double get overallAccuracy {
+    final all = allProgress;
+    if (all.isEmpty) return 0.0;
+    final totalAttempts = all.fold(0, (sum, p) => sum + p.totalAttempts);
+    final totalCorrect = all.fold(0, (sum, p) => sum + p.correctAttempts);
+    if (totalAttempts == 0) return 0.0;
+    return (totalCorrect / totalAttempts) * 100;
+  }
+
+  // Words that have been attempted but are struggling — answered at
+  // least twice, with less than 50% accuracy. These are the "weak words"
+  // worth highlighting to the user.
+  List<Progress> get weakWords {
+    return allProgress
+        .where((p) => p.totalAttempts >= 2 && (p.correctAttempts / p.totalAttempts) < 0.5)
+        .toList();
   }
 
   // Returns only the words that are DUE for review today — this is the
