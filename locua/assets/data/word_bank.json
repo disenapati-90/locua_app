@@ -11,5 +11,107 @@
   {"word": "obfuscate", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "The defense was accused of trying to obfuscate the timeline of events.", "definition": "to deliberately make something unclear or hard to understand", "synonyms": ["confuse", "muddle"], "antonyms": ["clarify", "illuminate"], "level": "hard"},
   {"word": "remonstrate", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "The lawyer stood to remonstrate against the judge's sudden ruling.", "definition": "to protest or argue forcefully in objection to something", "synonyms": ["protest", "object"], "antonyms": ["comply", "acquiesce"], "level": "hard"},
   {"word": "vindicate", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "The final ruling would either vindicate her or end her career.", "definition": "to clear someone of blame after they've been suspected or accused", "synonyms": ["exonerate", "absolve"], "antonyms": ["incriminate", "condemn"], "level": "hard"},
-  {"word": "acquiesce", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "Rather than fight the settlement further, the company chose to acquiesce.", "definition": "to accept or comply with something without protest", "synonyms": ["comply", "yield"], "antonyms": ["resist", "object"], "level": "hard"}
+  {"word": "acquiesce", "theme": "Courtroom Drama", "storyEpisode": 3, "sentence": "Rather than fight the settlement further, the company chose to acquiesce.", "definition": "to accept or comply with something without protest", "synonyms": ["comply", "yield"], "antonyms": ["resist", "object"], "level": "hard"},
+
+  {
+    "word": "bootstrap",
+    "theme": "Startup Life",
+    "storyEpisode": 1,
+    "sentence": "With no outside funding, the founders had to bootstrap the entire product themselves.",
+    "definition": "to build something using only existing resources, without external help",
+    "synonyms": ["self-fund", "self-start"],
+    "antonyms": ["outsource", "subsidize"],
+    "level": "easy"
+  },
+  {
+    "word": "pivot",
+    "theme": "Startup Life",
+    "storyEpisode": 1,
+    "sentence": "After months of flat growth, the team decided to pivot to a new market entirely.",
+    "definition": "to change strategy or direction significantly",
+    "synonyms": ["shift", "redirect"],
+    "antonyms": ["persist", "continue unchanged"],
+    "level": "easy"
+  },
+  {
+    "word": "runway",
+    "theme": "Startup Life",
+    "storyEpisode": 1,
+    "sentence": "With only four months of runway left, the CEO scrambled to close a new funding round.",
+    "definition": "the amount of time a company can operate before running out of money",
+    "synonyms": ["cash reserve period", "financial buffer"],
+    "antonyms": ["insolvency", "bankruptcy"],
+    "level": "medium"
+  },
+  {
+    "word": "scalable",
+    "theme": "Startup Life",
+    "storyEpisode": 2,
+    "sentence": "Investors were drawn to the idea because it seemed genuinely scalable across markets.",
+    "definition": "capable of being expanded or grown without a proportional rise in cost or effort",
+    "synonyms": ["expandable", "growth-ready"],
+    "antonyms": ["limited", "capped"],
+    "level": "medium"
+  },
+  {
+    "word": "attrition",
+    "theme": "Startup Life",
+    "storyEpisode": 2,
+    "sentence": "High attrition in the engineering team worried the board more than the missed deadlines.",
+    "definition": "the gradual reduction of staff through resignation or retirement",
+    "synonyms": ["turnover", "erosion"],
+    "antonyms": ["retention", "stability"],
+    "level": "medium"
+  },
+  {
+    "word": "synergy",
+    "theme": "Startup Life",
+    "storyEpisode": 2,
+    "sentence": "The merger was pitched as pure synergy, though few employees actually saw it that way.",
+    "definition": "the combined effect of two things being greater than their separate effects",
+    "synonyms": ["cooperation", "combined effect"],
+    "antonyms": ["conflict", "redundancy"],
+    "level": "medium"
+  },
+  {
+    "word": "cannibalize",
+    "theme": "Startup Life",
+    "storyEpisode": 3,
+    "sentence": "The new product risked cannibalizing sales of their own flagship offering.",
+    "definition": "to reduce the sales of one product by introducing another similar one",
+    "synonyms": ["undercut", "self-compete"],
+    "antonyms": ["complement", "boost"],
+    "level": "hard"
+  },
+  {
+    "word": "disintermediation",
+    "theme": "Startup Life",
+    "storyEpisode": 3,
+    "sentence": "By selling directly to consumers, the startup drove disintermediation across the entire industry.",
+    "definition": "the removal of intermediaries between producers and consumers",
+    "synonyms": ["cutting out the middleman", "direct distribution"],
+    "antonyms": ["intermediation", "channel reliance"],
+    "level": "hard"
+  },
+  {
+    "word": "capitulate",
+    "theme": "Startup Life",
+    "storyEpisode": 3,
+    "sentence": "Facing a hostile takeover bid, the board eventually chose to capitulate.",
+    "definition": "to cease resisting and accept an opponent's demands",
+    "synonyms": ["surrender", "concede"],
+    "antonyms": ["resist", "hold out"],
+    "level": "hard"
+  },
+  {
+    "word": "obsolescence",
+    "theme": "Startup Life",
+    "storyEpisode": 3,
+    "sentence": "The founders lived in constant fear of technological obsolescence.",
+    "definition": "the state of being outdated or no longer used",
+    "synonyms": ["outdatedness", "redundancy"],
+    "antonyms": ["relevance", "currency"],
+    "level": "hard"
+  }
+
 ]
