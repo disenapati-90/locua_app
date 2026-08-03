@@ -1,12 +1,14 @@
 // vault_screen.dart
 // Real Vault screen: shows the user's personal mnemonics (text or voice)
 // per word, with the ability to add a new one. Voice notes are recorded
-// via RecorderService and saved permanently via Hive.
+// and played back via RecorderService, and saved permanently via Hive.
 //
-// NOTE: voice recording only works on the native Android app, not in
-// this Web preview (browsers don't allow the filesystem access the
-// `record` package needs) — see recorder_service.dart for details.
+// NOTE: voice recording AND playback only work on the native Android
+// app, not in this Web preview (browsers don't allow the filesystem
+// access the `record`/`audioplayers` packages need here) — see
+// recorder_service.dart for details.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/mnemonic.dart';
 import '../services/storage_service.dart';
@@ -23,6 +25,49 @@ class _VaultScreenState extends State<VaultScreen> {
   bool _isRecording = false;
   String? _currentRecordingWord;
   String? _lastRecordedPath; // holds the finished recording until Save is tapped
+
+  // Tracks which voice note (by file path) is currently playing, so the
+  // right card shows a "stop" icon while others show "play".
+  String? _currentlyPlayingPath;
+  StreamSubscription<void>? _playbackCompleteSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Reset the play icon back to normal once a note finishes on its own.
+    _playbackCompleteSub = RecorderService.onPlaybackComplete.listen((_) {
+      if (mounted) {
+        setState(() => _currentlyPlayingPath = null);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _playbackCompleteSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _togglePlayback(String path) async {
+    if (_currentlyPlayingPath == path) {
+      // Already playing this one — stop it.
+      await RecorderService.stopPlayback();
+      setState(() => _currentlyPlayingPath = null);
+      return;
+    }
+
+    final started = await RecorderService.playRecording(path);
+    if (started) {
+      setState(() => _currentlyPlayingPath = path);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Voice playback works on the real Android app — not supported in this web preview.'),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +91,8 @@ class _VaultScreenState extends State<VaultScreen> {
                   itemCount: mnemonics.length,
                   itemBuilder: (context, index) {
                     final m = mnemonics[index];
+                    final isThisPlaying = _currentlyPlayingPath == m.audioFilePath;
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: Padding(
@@ -64,12 +111,20 @@ class _VaultScreenState extends State<VaultScreen> {
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.graphic_eq,
-                                        color: Theme.of(context).colorScheme.primary),
-                                    const SizedBox(width: 8),
-                                    const Text('Voice note saved'),
-                                    // NOTE: playback wiring comes in a later polish pass —
-                                    // for now this confirms the file path was saved.
+                                    IconButton(
+                                      icon: Icon(
+                                        isThisPlaying
+                                            ? Icons.stop_circle
+                                            : Icons.play_circle,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                      onPressed: () =>
+                                          _togglePlayback(m.audioFilePath!),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(isThisPlaying
+                                        ? 'Playing voice note...'
+                                        : 'Voice note saved'),
                                   ],
                                 ),
                               ),
