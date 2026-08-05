@@ -1,13 +1,17 @@
 // settings_screen.dart
 // Real Settings screen: theme switcher (Emerald/Midnight), a daily
-// reminder toggle (placeholder logic for now — real notifications come
-// later), and the Remove Ads purchase button wired to IapService.
+// reminder toggle with real scheduling (added this session), and the
+// Remove Ads purchase button wired to IapService.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/ad_provider.dart';
 import '../services/iap_service.dart';
+import '../services/storage_service.dart';
+import '../services/notification_service.dart';
+import '../models/app_meta.dart';
 import '../providers/progress_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -18,7 +22,75 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _reminderEnabled = true; // placeholder — real scheduling comes later
+  late AppMeta _appMeta;
+
+  @override
+  void initState() {
+    super.initState();
+    _appMeta = StorageService.getOrCreateAppMeta();
+  }
+
+  Future<void> _onReminderToggled(bool value) async {
+    if (value) {
+      if (kIsWeb) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Daily reminders work on the real Android app.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final granted = await NotificationService.requestPermission();
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Notification permission was denied — enable it in your device settings to get daily reminders.'),
+            ),
+          );
+        }
+        return; // Don't flip the toggle on if permission wasn't granted.
+      }
+
+      await NotificationService.scheduleDaily(
+          _appMeta.reminderHour, _appMeta.reminderMinute);
+    } else {
+      await NotificationService.cancelAll();
+    }
+
+    setState(() => _appMeta.reminderEnabled = value);
+    _appMeta.save();
+  }
+
+  Future<void> _pickReminderTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+          hour: _appMeta.reminderHour, minute: _appMeta.reminderMinute),
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _appMeta.reminderHour = picked.hour;
+      _appMeta.reminderMinute = picked.minute;
+    });
+    _appMeta.save();
+
+    if (_appMeta.reminderEnabled && !kIsWeb) {
+      await NotificationService.scheduleDaily(picked.hour, picked.minute);
+    }
+  }
+
+  String _formatTime(int hour, int minute) {
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+    final displayMinute = minute.toString().padLeft(2, '0');
+    return '$displayHour:$displayMinute $period';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,10 +123,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text('Daily reminder'),
                 subtitle: const Text('Get a nudge to practice each day'),
                 trailing: Switch(
-                  value: _reminderEnabled,
-                  onChanged: (value) => setState(() => _reminderEnabled = value),
+                  value: _appMeta.reminderEnabled,
+                  onChanged: _onReminderToggled,
                 ),
               ),
+              if (_appMeta.reminderEnabled) ...[
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Reminder time'),
+                  subtitle: Text(_formatTime(
+                      _appMeta.reminderHour, _appMeta.reminderMinute)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _pickReminderTime,
+                ),
+              ],
             ],
           ),
         ),
