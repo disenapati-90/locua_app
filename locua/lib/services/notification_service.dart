@@ -2,8 +2,19 @@
 // Wraps flutter_local_notifications for the daily practice reminder.
 // kIsWeb-guarded throughout — scheduling doesn't work reliably (or at all)
 // on Flutter Web, matching the same pattern used for record/IAP/ads.
-// Actual firing of a scheduled notification can only be confirmed on a
-// native Android build, not the web preview used during development.
+//
+// CHANGED: init() at app startup (main.dart) is wrapped in a 5-second
+// timeout there, to stop a slow native timezone lookup from ever hanging
+// the whole app on launch. But that meant on any device where the lookup
+// genuinely takes longer than 5s, the plugin silently never finished
+// initializing — so every later scheduleDaily()/requestPermission() call
+// quietly failed with no visible error, which is exactly what testers
+// reported ("notifications don't work"). Fixed with an ensureInit() guard
+// that both entry points call first, retrying initialization at that
+// later, foreground, user-initiated moment (no startup time pressure this
+// time) instead of relying solely on the one attempt made at cold start.
+// Failures here are no longer swallowed — they propagate so the caller
+// (Settings) can show the user something actionable.
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -17,10 +28,35 @@ class NotificationService {
 
   static const int _dailyReminderId = 1001;
 
-  /// Call once at app startup (main.dart), before any scheduling calls.
-  static Future<void> init() async {
-    if (kIsWeb) return;
+  static bool _initialized = false;
+  static Future<void>? _initFuture;
 
+  /// Call once at app startup (main.dart). Kept as a thin wrapper around
+  /// ensureInit() so main.dart's existing try/catch + timeout doesn't need
+  /// to change — this just delegates to the same shared init logic.
+  static Future<void> init() => ensureInit();
+
+  /// Guarantees the plugin is actually initialized before use. Safe to
+  /// call repeatedly — if init already succeeded, returns immediately；
+  /// if a previous attempt failed (e.g. timed out at startup), retries
+  /// here instead of leaving the plugin permanently uninitialized.
+  /// Throws on failure so callers can surface a real error instead of
+  /// silently no-op'ing forever.
+  static Future<void> ensureInit() {
+    if (kIsWeb) return Future.value();
+    if (_initialized) return Future.value();
+    // Avoid kicking off multiple concurrent init attempts if called from
+    // more than one place around the same time.
+    return _initFuture ??= _doInit().then((_) {
+      _initialized = true;
+      _initFuture = null;
+    }).catchError((e) {
+      _initFuture = null; // allow a future retry attempt
+      throw e;
+    });
+  }
+
+  static Future<void> _doInit() async {
     tz_data.initializeTimeZones();
     final locationName = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(locationName));
@@ -36,6 +72,7 @@ class NotificationService {
   /// Returns true if granted (or not required on this platform/OS version).
   static Future<bool> requestPermission() async {
     if (kIsWeb) return false;
+    await ensureInit(); // CHANGED: retry init here if the startup attempt failed
 
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
@@ -57,6 +94,7 @@ class NotificationService {
   /// time never results in duplicate notifications stacking up.
   static Future<void> scheduleDaily(int hour, int minute) async {
     if (kIsWeb) return;
+    await ensureInit(); // CHANGED: retry init here if the startup attempt failed
 
     await cancelAll();
 

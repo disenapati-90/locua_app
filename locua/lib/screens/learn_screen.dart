@@ -1,87 +1,120 @@
 // learn_screen.dart
-// Restructured Learn screen (Session 5): was a single flat scrollable list
-// of all words for the selected level. Now a 3-level flow matching the
-// validated HTML mockup:
-//   L1 — grid of theme tiles (progress-at-a-glance)
-//   L2 — episode list within the selected theme
-//   L3 — episode reader: each word's sentence is a "beat", tap to reveal
-//        definition/synonyms/antonyms, IN ORDER (sequential gating) —
-//        later words are visible but locked until earlier ones are read.
-//
-// Content note: word_bank.json still has one sentence per word (no
-// multi-beat narration yet), so each L3 "beat" is just that word's
-// sentence. Story episodes are grouped from the flat word list by
-// (theme, storyEpisode) rather than a new JSON schema — no content
-// migration needed.
-//
-// Dev Mode: a debug-only toggle (kDebugMode-gated) that lets you reveal
-// words in any order and jump straight to "episode complete" while
-// testing, without re-reading every episode from the top each time.
+// Restructured Learn screen: 3-level flow (theme grid -> episode list ->
+// reader). CHANGED this session: now actually consumes NavProvider's
+// pendingTheme/themeRequestId — this was always missing in every version
+// built this session, which is the full root cause of Home's theme cards
+// never deep-linking correctly. Also caches the word-bank Future in
+// initState instead of reloading it every build, since watching
+// NavProvider now means this screen rebuilds on every tab switch
+// app-wide (IndexedStack keeps it mounted), not just when it's visible.
 
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:provider/provider.dart';
 import '../models/word.dart';
 import '../services/word_service.dart';
-import '../services/tts_service.dart';
+import '../providers/nav_provider.dart';
+import '../providers/progress_provider.dart';
+import '../widgets/word_check_sheet.dart';
 
-/// One episode = all words sharing the same theme + storyEpisode number.
 class _Episode {
   final String theme;
   final int number;
   final List<Word> words;
   _Episode({required this.theme, required this.number, required this.words});
-
   String get title => 'Episode $number';
 }
 
-/// One theme = all words sharing the same theme name, grouped into episodes.
 class _Theme {
   final String name;
   final List<_Episode> episodes;
   _Theme({required this.name, required this.episodes});
-
   int get totalWords => episodes.fold(0, (sum, e) => sum + e.words.length);
+  List<Word> get allWords => episodes.expand((e) => e.words).toList();
 }
 
 enum _Level { themes, episodes, reader }
 
+IconData _iconForTheme(String themeName) {
+  final lower = themeName.toLowerCase();
+  const map = <String, IconData>{
+    'job interview': Icons.business_center,
+    'interview': Icons.business_center,
+    'startup': Icons.rocket_launch,
+    'courtroom': Icons.gavel,
+    'medical': Icons.local_hospital,
+    'political': Icons.campaign,
+    'museum': Icons.museum,
+    'space': Icons.satellite_alt,
+    'restaurant': Icons.restaurant,
+    'wedding': Icons.celebration,
+    'wildlife': Icons.pets,
+    'cybersecurity': Icons.security,
+    'college': Icons.school,
+    'university': Icons.school,
+    'travel': Icons.flight,
+    'sports': Icons.sports_soccer,
+    'cooking': Icons.soup_kitchen,
+    'finance': Icons.account_balance,
+    'financial': Icons.account_balance,
+    'adoption': Icons.family_restroom,
+    'archaeolog': Icons.explore,
+    'diplomatic': Icons.handshake,
+    'negotiation': Icons.handshake,
+    'divorce': Icons.gavel,
+    'esports': Icons.sports_esports,
+    'fraud': Icons.gavel,
+    'investigation': Icons.search,
+  };
+  for (final entry in map.entries) {
+    if (lower.contains(entry.key)) return entry.value;
+  }
+  return Icons.menu_book;
+}
+
+const List<Color> _themeAccentColors = [
+  Color(0xFFE0A233), Color(0xFF4F8FE0), Color(0xFF4FAE7C),
+  Color(0xFFD1568C), Color(0xFF3FB6B0), Color(0xFFD1594F), Color(0xFF8B6FD1),
+];
+
 class LearnScreen extends StatefulWidget {
   const LearnScreen({super.key});
-
   @override
   State<LearnScreen> createState() => _LearnScreenState();
 }
 
 class _LearnScreenState extends State<LearnScreen> {
-  String _selectedLevel = 'all'; // easy/medium/hard filter, applies at L1
   _Level _nav = _Level.themes;
   _Theme? _activeTheme;
   _Episode? _activeEpisode;
-
-  // Sequential reveal state for the currently open episode.
   final List<String> _revealedInOrder = [];
   bool _devMode = false;
+  List<Word> _allWordsCache = [];
+
+  // ADDED: cached future (was recreated every build before).
+  late Future<List<Word>> _wordsFuture;
+
+  // ADDED: tracks the last-handled deep-link request so we don't replay
+  // the same jump on every subsequent rebuild.
+  int _lastHandledThemeRequestId = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _wordsFuture = WordService.loadWords();
+  }
 
   List<_Theme> _buildThemes(List<Word> words) {
-    final filtered = words
-        .where((w) => _selectedLevel == 'all' || w.level == _selectedLevel)
-        .toList();
-
     final byTheme = <String, Map<int, List<Word>>>{};
-    for (final w in filtered) {
+    for (final w in words) {
       byTheme.putIfAbsent(w.theme, () => {});
       byTheme[w.theme]!.putIfAbsent(w.storyEpisode, () => []);
       byTheme[w.theme]![w.storyEpisode]!.add(w);
     }
-
     return byTheme.entries.map((themeEntry) {
       final episodes = themeEntry.value.entries.map((epEntry) {
-        return _Episode(
-          theme: themeEntry.key,
-          number: epEntry.key,
-          words: epEntry.value,
-        );
+        return _Episode(theme: themeEntry.key, number: epEntry.key, words: epEntry.value);
       }).toList()
         ..sort((a, b) => a.number.compareTo(b.number));
       return _Theme(name: themeEntry.key, episodes: episodes);
@@ -117,42 +150,84 @@ class _LearnScreenState extends State<LearnScreen> {
     });
   }
 
-  void _revealWord(String word) {
-    final order = _activeEpisode!.words.map((w) => w.word).toList();
+  List<String> _pickDistractors(Word current) {
+    final others = _allWordsCache.where((w) => w.word != current.word).map((w) => w.definition).toList()..shuffle();
+    return others.take(2).toList();
+  }
+
+  void _openWordCheck(Word w) {
+    final order = _activeEpisode!.words.map((x) => x.word).toList();
+    final alreadyRevealed = _revealedInOrder.contains(w.word);
     final nextExpected = order[_revealedInOrder.length.clamp(0, order.length - 1)];
 
-    if (!_devMode && word != nextExpected && !_revealedInOrder.contains(word)) {
-      // Out-of-order tap in sequential mode: just nudge, don't reveal.
+    if (!alreadyRevealed && !_devMode && w.word != nextExpected) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Read from the top — reveal words in order'),
-          duration: Duration(milliseconds: 1400),
-        ),
+        const SnackBar(content: Text('Read from the top — reveal words in order'), duration: Duration(milliseconds: 1400)),
       );
       return;
     }
-    setState(() {
-      if (!_revealedInOrder.contains(word)) _revealedInOrder.add(word);
-    });
+
+    final data = WordCheckData(
+      word: w.word,
+      correctMeaning: w.definition,
+      distractorMeanings: _pickDistractors(w),
+      synonyms: w.synonyms,
+      antonyms: w.antonyms,
+      pronunciationText: w.word,
+    );
+
+    showWordCheckSheet(
+      context: context,
+      data: data,
+      startAtDetail: alreadyRevealed,
+      onComplete: () {
+        setState(() {
+          if (!_revealedInOrder.contains(w.word)) _revealedInOrder.add(w.word);
+        });
+      },
+    );
   }
 
   void _unlockAll() {
     setState(() {
-      _revealedInOrder
-        ..clear()
-        ..addAll(_activeEpisode!.words.map((w) => w.word));
+      _revealedInOrder..clear()..addAll(_activeEpisode!.words.map((w) => w.word));
     });
+  }
+
+  void _continueToWordDetective() {
+    context.read<NavProvider>().setIndex(2);
   }
 
   @override
   Widget build(BuildContext context) {
+    // ADDED: watch NavProvider so an incoming deep-link request triggers
+    // a rebuild here even while this tab isn't the visible one.
+    final navProvider = context.watch<NavProvider>();
+
     return FutureBuilder<List<Word>>(
-      future: WordService.loadWords(),
+      future: _wordsFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
+        _allWordsCache = snapshot.data!;
         final themes = _buildThemes(snapshot.data!);
+
+        // ADDED: consume Home's pending theme deep-link. If a new request
+        // (by id, not just by name — a repeat tap on the same theme still
+        // counts as new) is waiting, jump straight to that theme's
+        // episode list instead of landing on the L1 grid.
+        if (navProvider.pendingTheme != null &&
+            navProvider.themeRequestId != _lastHandledThemeRequestId) {
+          _lastHandledThemeRequestId = navProvider.themeRequestId;
+          final targetName = navProvider.pendingTheme;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final match = themes.where((t) => t.name == targetName);
+            if (match.isNotEmpty) _openTheme(match.first);
+            navProvider.clearPendingTheme();
+          });
+        }
 
         return Column(
           children: [
@@ -170,93 +245,54 @@ class _LearnScreenState extends State<LearnScreen> {
     );
   }
 
-  // ---------------- Header (back button + dev toggle) ----------------
-
   Widget _buildHeader(BuildContext context) {
     final title = switch (_nav) {
       _Level.themes => 'Learn',
       _Level.episodes => _activeTheme?.name ?? '',
       _Level.reader => _activeEpisode?.title ?? '',
     };
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
       child: Row(
         children: [
           if (_nav != _Level.themes)
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _goBack,
-            )
+            IconButton(icon: const Icon(Icons.arrow_back), onPressed: _goBack)
           else
             const SizedBox(width: 48),
-          Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-          ),
+          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
           if (kDebugMode && _nav == _Level.reader)
-            Row(
-              children: [
-                Text('Dev', style: Theme.of(context).textTheme.labelSmall),
-                Switch(
-                  value: _devMode,
-                  onChanged: (v) => setState(() => _devMode = v),
-                ),
-              ],
-            ),
+            Row(children: [
+              Text('Dev', style: Theme.of(context).textTheme.labelSmall),
+              Switch(value: _devMode, onChanged: (v) => setState(() => _devMode = v)),
+            ]),
         ],
       ),
     );
   }
 
-  // ---------------- L1: theme tiles ----------------
-
   Widget _buildThemeGrid(BuildContext context, List<_Theme> themes) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              _levelChip('all', 'All'),
-              const SizedBox(width: 8),
-              _levelChip('easy', 'Easy'),
-              const SizedBox(width: 8),
-              _levelChip('medium', 'Medium'),
-              const SizedBox(width: 8),
-              _levelChip('hard', 'Hard'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.15,
-            ),
-            itemCount: themes.length,
-            itemBuilder: (context, i) {
-              final t = themes[i];
-              return _ThemeTile(theme: t, onTap: () => _openTheme(t));
-            },
-          ),
-        ),
-      ],
+    final progressProvider = context.watch<ProgressProvider>();
+    final progressByWord = {for (final p in progressProvider.allProgress) p.word: p};
+    bool isLearned(String word) => progressByWord[word]?.learned ?? false;
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.95,
+      ),
+      itemCount: themes.length,
+      itemBuilder: (context, i) {
+        final t = themes[i];
+        final learned = t.allWords.where((w) => isLearned(w.word)).length;
+        return _ThemeTile(
+          theme: t,
+          learnedCount: learned,
+          accentColor: _themeAccentColors[i % _themeAccentColors.length],
+          onTap: () => _openTheme(t),
+        );
+      },
     );
   }
-
-  Widget _levelChip(String value, String label) {
-    final isSelected = _selectedLevel == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => setState(() => _selectedLevel = value),
-    );
-  }
-
-  // ---------------- L2: episode list ----------------
 
   Widget _buildEpisodeList(BuildContext context) {
     final episodes = _activeTheme!.episodes;
@@ -279,18 +315,13 @@ class _LearnScreenState extends State<LearnScreen> {
     );
   }
 
-  // ---------------- L3: episode reader (sequential reveal) ----------------
-
   Widget _buildReader(BuildContext context) {
     final words = _activeEpisode!.words;
-    final nextExpected = _revealedInOrder.length < words.length
-        ? words[_revealedInOrder.length].word
-        : null;
+    final nextExpected = _revealedInOrder.length < words.length ? words[_revealedInOrder.length].word : null;
     final allDone = _revealedInOrder.length >= words.length;
 
     return Column(
       children: [
-        // Progress dots
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
@@ -304,8 +335,8 @@ class _LearnScreenState extends State<LearnScreen> {
                   color: done
                       ? Theme.of(context).colorScheme.secondary
                       : current
-                          ? Theme.of(context).colorScheme.secondary.withOpacity(0.5)
-                          : Theme.of(context).colorScheme.surfaceVariant,
+                          ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
               );
             }).toList(),
@@ -316,11 +347,7 @@ class _LearnScreenState extends State<LearnScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Align(
               alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: _unlockAll,
-                icon: const Icon(Icons.bolt, size: 16),
-                label: const Text('Unlock all words'),
-              ),
+              child: TextButton.icon(onPressed: _unlockAll, icon: const Icon(Icons.bolt, size: 16), label: const Text('Unlock all words')),
             ),
           ),
         Expanded(
@@ -342,24 +369,13 @@ class _LearnScreenState extends State<LearnScreen> {
                     children: [
                       _buildHighlightedSentence(context, w, isRevealed, locked),
                       if (isRevealed) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         const Divider(),
-                        Text(w.word.toUpperCase(),
-                            style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: 4),
-                        Text(w.definition,
-                            style: Theme.of(context).textTheme.bodyLarge),
-                        const SizedBox(height: 8),
-                        Text('Synonyms: ${w.synonyms.join(", ")}',
-                            style: Theme.of(context).textTheme.bodyMedium),
-                        Text('Antonyms: ${w.antonyms.join(", ")}',
-                            style: Theme.of(context).textTheme.bodyMedium),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: () => TtsService.speak(w.word),
-                          icon: const Icon(Icons.volume_up, size: 18),
-                          label: const Text('Hear pronunciation'),
-                        ),
+                        Row(children: [
+                          Icon(Icons.check_circle_outline, size: 16, color: Theme.of(context).colorScheme.secondary),
+                          const SizedBox(width: 6),
+                          Text('Reviewed — tap the word to check again', style: Theme.of(context).textTheme.bodySmall),
+                        ]),
                       ],
                     ],
                   ),
@@ -373,20 +389,8 @@ class _LearnScreenState extends State<LearnScreen> {
           child: SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: allDone
-                  ? () {
-                      // TODO: hand off to Word Detective for these words
-                      // once that screen exists — mirrors mockup's
-                      // "Continue to Word Detective" CTA.
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Continue to Word Detective (TODO)')),
-                      );
-                    }
-                  : null,
-              child: Text(allDone
-                  ? 'Continue to Word Detective'
-                  : 'Tap the highlighted word to continue'),
+              onPressed: allDone ? _continueToWordDetective : null,
+              child: Text(allDone ? 'Continue to Word Detective' : 'Tap the highlighted word to continue'),
             ),
           ),
         ),
@@ -394,21 +398,17 @@ class _LearnScreenState extends State<LearnScreen> {
     );
   }
 
-  Widget _buildHighlightedSentence(
-      BuildContext context, Word w, bool isRevealed, bool locked) {
+  Widget _buildHighlightedSentence(BuildContext context, Word w, bool isRevealed, bool locked) {
     final sentence = w.sentence;
     final wordIndex = sentence.toLowerCase().indexOf(w.word.toLowerCase());
-
     if (wordIndex == -1) {
       return Text(sentence, style: Theme.of(context).textTheme.bodyLarge);
     }
-
     final before = sentence.substring(0, wordIndex);
     final match = sentence.substring(wordIndex, wordIndex + w.word.length);
     final after = sentence.substring(wordIndex + w.word.length);
-
     final color = locked
-        ? Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5)
+        ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
         : Theme.of(context).colorScheme.secondary;
 
     return RichText(
@@ -419,14 +419,10 @@ class _LearnScreenState extends State<LearnScreen> {
           TextSpan(
             text: match,
             style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              decoration: TextDecoration.underline,
-              decorationStyle:
-                  locked ? TextDecorationStyle.dotted : TextDecorationStyle.solid,
+              color: color, fontWeight: FontWeight.bold, decoration: TextDecoration.underline,
+              decorationStyle: locked ? TextDecorationStyle.dotted : TextDecorationStyle.solid,
             ),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => _revealWord(w.word),
+            recognizer: TapGestureRecognizer()..onTap = () => _openWordCheck(w),
           ),
           TextSpan(text: after),
         ],
@@ -437,27 +433,40 @@ class _LearnScreenState extends State<LearnScreen> {
 
 class _ThemeTile extends StatelessWidget {
   final _Theme theme;
+  final int learnedCount;
+  final Color accentColor;
   final VoidCallback onTap;
-  const _ThemeTile({required this.theme, required this.onTap});
+  const _ThemeTile({required this.theme, required this.learnedCount, required this.accentColor, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final total = theme.totalWords;
+    final percent = total == 0 ? 0.0 : learnedCount / total;
+    final percentLabel = '${(percent * 100).round()}%';
+
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(14.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(theme.name,
-                  style: Theme.of(context).textTheme.titleMedium,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
-              Text('${theme.episodes.length} episodes · ${theme.totalWords} words',
-                  style: Theme.of(context).textTheme.bodySmall),
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: accentColor.withValues(alpha: 0.22), border: Border.all(color: accentColor, width: 2.5)),
+                child: Icon(_iconForTheme(theme.name), color: accentColor, size: 20),
+              ),
+              const SizedBox(height: 10),
+              Text(theme.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text('$learnedCount/$total ${total == 1 ? "word" : "words"} · $percentLabel', style: Theme.of(context).textTheme.bodySmall),
+              const Spacer(),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(value: percent.clamp(0.0, 1.0), minHeight: 5, valueColor: AlwaysStoppedAnimation(accentColor)),
+              ),
             ],
           ),
         ),

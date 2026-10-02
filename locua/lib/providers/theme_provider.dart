@@ -6,104 +6,179 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 // Simple enum to represent which theme is currently active.
-// Using an enum (instead of raw strings) avoids typos like "emerlad" breaking things silently.
 enum AppThemeOption { emerald, midnight }
 
 // ---------------------------------------------------------------------------
-// THEME 1: Emerald & Gold
-// Deep forest green background with gold accents — the primary brand theme,
-// based on the finalized Locua logo (column + laurel wreath + language ring).
+// THEME 1: Emerald & Gold (High-Contrast Editorial)
 // ---------------------------------------------------------------------------
 final ThemeData emeraldTheme = ThemeData(
   brightness: Brightness.dark,
-  scaffoldBackgroundColor: const Color(0xFF0B2B22), // bg
+  scaffoldBackgroundColor: const Color(0xFF040E0B), // Ultra-deep matte onyx emerald
   colorScheme: const ColorScheme.dark(
-    surface: Color(0xFF163C2E),      // surface (cards)
-    primary: Color(0xFFC9A227),      // gold (buttons, highlights)
-    secondary: Color(0xFFE4C158),    // gold-bright (accents)
-    onSurface: Color(0xFFF5EFD9),    // text primary
+    surface: Color(0xFF0E241E),      // Lighter surface card depth
+    primary: Color(0xFFD4AF37),      // True crisp antique gold
+    secondary: Color(0xFFF3E5AB),    // Elegant vanilla gold highlight
+    secondaryContainer: Color(0xFFD4AF37), // Linked to ensure branded accent container pills
+    onSurface: Color(0xFFFAF6E6),    // Parchment high-readability text
   ),
-  // Headings use Playfair Display (elegant serif, matches the wordmark)
   textTheme: TextTheme(
     displayLarge: GoogleFonts.playfairDisplay(
-      fontSize: 24, fontWeight: FontWeight.w700, color: const Color(0xFFF5EFD9),
+      fontSize: 26, 
+      fontWeight: FontWeight.w800, 
+      color: const Color(0xFFFAF6E6),
+      letterSpacing: -0.5,
     ),
     titleLarge: GoogleFonts.playfairDisplay(
-      fontSize: 18, fontWeight: FontWeight.w600, color: const Color(0xFFF5EFD9),
-    ),
-    // Body text uses Inter (clean, highly readable for definitions/riddles)
-    bodyMedium: GoogleFonts.inter(
-      fontSize: 14, color: const Color(0xFFA8C3B5), // text secondary
+      fontSize: 20, 
+      fontWeight: FontWeight.w700, 
+      color: const Color(0xFFFAF6E6),
+      letterSpacing: 0.2,
     ),
     bodyLarge: GoogleFonts.inter(
-      fontSize: 14, color: const Color(0xFFF5EFD9), // text primary
+      fontSize: 15, 
+      fontWeight: FontWeight.w500,
+      color: const Color(0xFFFAF6E6), 
+      height: 1.55, // POLISHED: Generous editorial line-height ratio
+      letterSpacing: 0.15,
+    ),
+    bodyMedium: GoogleFonts.inter(
+      fontSize: 13, 
+      fontWeight: FontWeight.w400,
+      color: const Color(0xFF85AFA2), // High-contrast sage secondary text
+      height: 1.45,
+      letterSpacing: 0.1,
     ),
   ),
   appBarTheme: const AppBarTheme(
-    backgroundColor: Color(0xFF0B2B22),
+    backgroundColor: Color(0xFF040E0B),
     elevation: 0,
+    centerTitle: true,
+  ),
+  cardTheme: CardThemeData(
+    color: const Color(0xFF0E241E),
+    elevation: 4,
+    shadowColor: const Color(0xFF040E0B).withOpacity(0.5),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(24),
+        bottomRight: Radius.circular(24),
+        topRight: Radius.circular(10),
+        bottomLeft: Radius.circular(10),
+      ),
+      side: BorderSide(color: Color(0xFFD4AF37), width: 1.2),
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: const Color(0xFF16372D),
+    labelStyle: GoogleFonts.inter(color: const Color(0xFF85AFA2)),
+    hintStyle: GoogleFonts.inter(color: const Color(0xFF85AFA2).withOpacity(0.6)),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: const Color(0xFFD4AF37).withOpacity(0.3)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFD4AF37), width: 1.5),
+    ),
   ),
 );
 
 // ---------------------------------------------------------------------------
-// THEME 2: Midnight & Gold
-// Deep navy background with a slightly cooler gold — the secondary theme,
-// same premium feel, different mood. User picks this in Settings.
+// THEME 2: Midnight & Gold (High-Contrast Academic)
 // ---------------------------------------------------------------------------
 final ThemeData midnightTheme = ThemeData(
   brightness: Brightness.dark,
-  scaffoldBackgroundColor: const Color(0xFF0D1B2A), // bg
+  scaffoldBackgroundColor: const Color(0xFF050B12), // Deep cosmic black-indigo
   colorScheme: const ColorScheme.dark(
-    surface: Color(0xFF142238),      // surface (cards)
-    primary: Color(0xFFC6A15B),      // gold (buttons, highlights)
-    secondary: Color(0xFFDEB975),    // gold-bright (accents)
-    onSurface: Color(0xFFF2EFEA),    // text primary
+    surface: Color(0xFF101B2B),      // Layered deep slate blue surface
+    primary: Color(0xFFCBA358),      // Premium architectural brass gold
+    secondary: Color(0xFFEEDBB2),    // Crisp champagne accent gold
+    secondaryContainer: Color(0xFFCBA358),
+    onSurface: Color(0xFFF9F8F6),    // Pure contrast silver text
   ),
   textTheme: TextTheme(
     displayLarge: GoogleFonts.playfairDisplay(
-      fontSize: 24, fontWeight: FontWeight.w700, color: const Color(0xFFF2EFEA),
+      fontSize: 26, 
+      fontWeight: FontWeight.w800, 
+      color: const Color(0xFFF9F8F6),
+      letterSpacing: -0.5,
     ),
     titleLarge: GoogleFonts.playfairDisplay(
-      fontSize: 18, fontWeight: FontWeight.w600, color: const Color(0xFFF2EFEA),
-    ),
-    bodyMedium: GoogleFonts.inter(
-      fontSize: 14, color: const Color(0xFF8FA3BF), // text secondary
+      fontSize: 20, 
+      fontWeight: FontWeight.w700, 
+      color: const Color(0xFFF9F8F6),
+      letterSpacing: 0.2,
     ),
     bodyLarge: GoogleFonts.inter(
-      fontSize: 14, color: const Color(0xFFF2EFEA), // text primary
+      fontSize: 15, 
+      fontWeight: FontWeight.w500,
+      color: const Color(0xFFF9F8F6), 
+      height: 1.55, // POLISHED: Generous editorial line-height ratio
+      letterSpacing: 0.15,
+    ),
+    bodyMedium: GoogleFonts.inter(
+      fontSize: 13, 
+      fontWeight: FontWeight.w400,
+      color: const Color(0xFF7A93B4), // Vibrant high-contrast secondary slate
+      height: 1.45,
+      letterSpacing: 0.1,
     ),
   ),
   appBarTheme: const AppBarTheme(
-    backgroundColor: Color(0xFF0D1B2A),
+    backgroundColor: Color(0xFF050B12),
     elevation: 0,
+    centerTitle: true,
+  ),
+  cardTheme: CardThemeData(
+    color: const Color(0xFF101B2B),
+    elevation: 4,
+    shadowColor: const Color(0xFF050B12).withOpacity(0.5),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(24),
+        bottomRight: Radius.circular(24),
+        topRight: Radius.circular(10),
+        bottomLeft: Radius.circular(10),
+      ),
+      side: BorderSide(color: Color(0xFFCBA358), width: 1.2),
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: const Color(0xFF182A42),
+    labelStyle: GoogleFonts.inter(color: const Color(0xFF7A93B4)),
+    hintStyle: GoogleFonts.inter(color: const Color(0xFF7A93B4).withOpacity(0.6)),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: const Color(0xFFCBA358).withOpacity(0.3)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFCBA358), width: 1.5),
+    ),
   ),
 );
 
 // ---------------------------------------------------------------------------
 // ThemeProvider: holds which theme is currently active and notifies the
-// whole app to rebuild when it changes. Any screen can call
-// context.read<ThemeProvider>().toggleTheme() to switch themes instantly.
-//
-// NOTE: this is in-memory only for now (resets on app restart).
-// On Day 3, once Hive is wired in, we'll persist the choice so the user's
-// theme selection survives closing/reopening the app.
+// whole app to rebuild when it changes.
 // ---------------------------------------------------------------------------
 class ThemeProvider extends ChangeNotifier {
   AppThemeOption _current = AppThemeOption.emerald; // default theme
 
   AppThemeOption get current => _current;
 
-  // Returns the actual ThemeData object matching the current selection.
   ThemeData get themeData =>
       _current == AppThemeOption.emerald ? emeraldTheme : midnightTheme;
 
-  // Switches to a specific theme.
   void setTheme(AppThemeOption option) {
     _current = option;
-    notifyListeners(); // tells every listening widget to rebuild with new theme
+    notifyListeners();
   }
 
-  // Convenience toggle between the two themes.
   void toggleTheme() {
     _current = _current == AppThemeOption.emerald
         ? AppThemeOption.midnight

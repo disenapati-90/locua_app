@@ -2,8 +2,10 @@
 // Real Word Detective screen: pulls only words that are DUE for review
 // today (per SRS scheduling in ProgressProvider), shows a riddle built
 // from synonyms/antonyms, and lets the user answer via multiple choice.
-// Also shows a styled banner ad every 5th answered question (capped at
-// 3 per session), per AdProvider's logic.
+//
+// CHANGED: the "Next" button was pinned to the screen's bottom edge via
+// Spacer(), leaving a large empty gap and making it small/easy to miss —
+// same issue and same fix as quick_quiz_screen.dart, kept consistent.
 
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -11,8 +13,6 @@ import 'package:provider/provider.dart';
 import '../models/word.dart';
 import '../services/word_service.dart';
 import '../providers/progress_provider.dart';
-import '../providers/ad_provider.dart';
-import '../widgets/native_banner_ad.dart';
 
 class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
@@ -28,7 +28,6 @@ class _PracticeScreenState extends State<PracticeScreen> {
   List<String> _choices = [];
   String? _selectedChoice;
   bool _answered = false;
-  bool _showAdNow = false;
 
   @override
   void initState() {
@@ -47,8 +46,6 @@ class _PracticeScreenState extends State<PracticeScreen> {
     });
   }
 
-  // Builds 3 answer options: the correct word + 2 random distractors
-  // from the rest of the word bank.
   void _generateChoices() {
     final correct = _dueWords[_currentIndex].word;
     final others = _allWords
@@ -73,20 +70,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
       progressProvider.markIncorrect(correctWord);
     }
 
-    final adProvider = context.read<AdProvider>();
-    final shouldShowAd = adProvider.registerAnsweredQuestion();
-
     setState(() {
       _selectedChoice = choice;
       _answered = true;
-      _showAdNow = shouldShowAd;
     });
   }
 
   void _nextQuestion() {
     setState(() {
       _currentIndex++;
-      _showAdNow = false; // clear ad flag before moving to next question
       if (_currentIndex < _dueWords.length) {
         _generateChoices();
       }
@@ -123,7 +115,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
     final currentWord = _dueWords[_currentIndex];
     final riddle = WordService.generateRiddle(currentWord);
 
-    return Padding(
+    // CHANGED: was a Column ending in [..., const Spacer(), button] —
+    // removed Spacer, wrapped in SingleChildScrollView, button now sits
+    // directly below the answer choices with a fixed gap.
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,17 +135,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // ---- Banner ad slot (only appears when AdProvider says it's due) ----
-          if (_showAdNow) const NativeBannerAd(),
-
-          // ---- Answer choices ----
           ..._choices.map((choice) {
             final isSelected = _selectedChoice == choice;
             final isCorrectChoice = choice == currentWord.word;
 
-            // Color logic: after answering, show green for correct,
-            // red for a wrong pick — otherwise neutral.
             Color? tileColor;
             if (_answered) {
               if (isCorrectChoice) {
@@ -169,13 +157,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
             );
           }),
-
-          const Spacer(),
-          if (_answered)
-            ElevatedButton(
-              onPressed: _nextQuestion,
-              child: const Text('Next'),
+          if (_answered) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _nextQuestion,
+                child: const Text('Next'),
+              ),
             ),
+          ],
         ],
       ),
     );

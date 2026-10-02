@@ -1,21 +1,18 @@
 // home_widgets.dart
 // Reusable widgets for the redesigned Home screen (glass hero, mini stat
 // rings, theme rail cards, quick-access tiles, word-of-the-day card).
-// All colors/spacing come from AppPalette/AppMetrics in app_design.dart —
-// no hardcoded hex values in here, so a theme or spacing tweak never
-// requires touching this file.
+// All colors/spacing come from AppPalette/AppMetrics in app_design.dart.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_design.dart';
 
-/// "Continue" card at the top of Home — current theme, progress, Resume.
 class GlassHeroCard extends StatelessWidget {
   final AppPalette palette;
   final String contextLabel;
   final String themeTitle;
   final String subtitle;
-  final double progress; // 0..1
+  final double progress;
   final VoidCallback onResume;
 
   const GlassHeroCard({
@@ -92,7 +89,7 @@ class GlassHeroCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
               minHeight: 6,
-              backgroundColor: Colors.white.withOpacity(0.08),
+              backgroundColor: Colors.white.withValues(alpha: 0.08), // CHANGED
               valueColor: AlwaysStoppedAnimation(palette.goldBright),
             ),
           ),
@@ -102,10 +99,9 @@ class GlassHeroCard extends StatelessWidget {
   }
 }
 
-/// Small circular stat (This Week / Accuracy / Streak style ring).
 class MiniRingStat extends StatelessWidget {
   final AppPalette palette;
-  final double percent; // 0..1
+  final double percent;
   final String centerText;
   final String label;
   final Color ringColor;
@@ -132,7 +128,7 @@ class MiniRingStat extends StatelessWidget {
               CircularProgressIndicator(
                 value: percent.clamp(0.0, 1.0),
                 strokeWidth: 5,
-                backgroundColor: Colors.white.withOpacity(0.08),
+                backgroundColor: palette.surfaceAlt,
                 valueColor: AlwaysStoppedAnimation(ringColor),
               ),
               Container(
@@ -163,12 +159,11 @@ class MiniRingStat extends StatelessWidget {
   }
 }
 
-/// One card in the horizontally-scrolling "Themes" rail.
 class ThemeRailCard extends StatelessWidget {
   final AppPalette palette;
   final String themeName;
-  final double percent; // 0..1
-  final String level; // "easy" | "medium" | "hard"
+  final double percent;
+  final String level;
   final int learned;
   final int total;
   final Color accent1;
@@ -223,7 +218,7 @@ class ThemeRailCard extends StatelessWidget {
                 child: CircularProgressIndicator(
                   value: percent.clamp(0.0, 1.0),
                   strokeWidth: 3,
-                  backgroundColor: Colors.white.withOpacity(0.15),
+                  backgroundColor: Colors.white.withValues(alpha: 0.15), // CHANGED
                   valueColor: AlwaysStoppedAnimation(palette.goldBright),
                 ),
               ),
@@ -238,7 +233,7 @@ class ThemeRailCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: _levelColor.withOpacity(0.18),
+                color: _levelColor.withValues(alpha: 0.18), // CHANGED
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
@@ -255,7 +250,7 @@ class ThemeRailCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: percent.clamp(0.0, 1.0),
                     minHeight: 4,
-                    backgroundColor: Colors.white.withOpacity(0.15),
+                    backgroundColor: Colors.white.withValues(alpha: 0.15), // CHANGED
                     valueColor: AlwaysStoppedAnimation(palette.goldBright),
                   ),
                 ),
@@ -271,9 +266,6 @@ class ThemeRailCard extends StatelessWidget {
   }
 }
 
-/// Wraps a horizontal rail with a right-edge fade so it's visually obvious
-/// there's more content to scroll (desktop testers won't miss it — see
-/// the Origins-screen backlog note about this same issue).
 class FadeEdgeRail extends StatelessWidget {
   final AppPalette palette;
   final double height;
@@ -302,7 +294,7 @@ class FadeEdgeRail extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [palette.bg.withOpacity(0), palette.bg],
+                  colors: [palette.bg.withValues(alpha: 0), palette.bg], // CHANGED
                 ),
               ),
             ),
@@ -313,7 +305,6 @@ class FadeEdgeRail extends StatelessWidget {
   }
 }
 
-/// One tile in the "Quick Access" row (Detective / Origins / Vault).
 class QuickAccessTile extends StatelessWidget {
   final AppPalette palette;
   final IconData icon;
@@ -356,7 +347,6 @@ class QuickAccessTile extends StatelessWidget {
   }
 }
 
-/// Compact "Word of the Day" card at the bottom of Home.
 class WordOfDayCard extends StatelessWidget {
   final AppPalette palette;
   final String word;
@@ -379,7 +369,7 @@ class WordOfDayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.surface,
         borderRadius: BorderRadius.circular(AppMetrics.radiusMd),
-        border: Border(top: BorderSide(color: palette.gold.withOpacity(0.25))),
+        border: Border(top: BorderSide(color: palette.gold.withValues(alpha: 0.25))), // CHANGED
       ),
       child: Column(
         children: [

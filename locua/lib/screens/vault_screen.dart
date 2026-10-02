@@ -4,9 +4,7 @@
 // and played back via RecorderService, and saved permanently via Hive.
 //
 // NOTE: voice recording AND playback only work on the native Android
-// app, not in this Web preview (browsers don't allow the filesystem
-// access the `record`/`audioplayers` packages need here) — see
-// recorder_service.dart for details.
+// app, not in this Web preview.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -23,18 +21,14 @@ class VaultScreen extends StatefulWidget {
 
 class _VaultScreenState extends State<VaultScreen> {
   bool _isRecording = false;
-  String? _currentRecordingWord;
-  String? _lastRecordedPath; // holds the finished recording until Save is tapped
+  String? _lastRecordedPath;
 
-  // Tracks which voice note (by file path) is currently playing, so the
-  // right card shows a "stop" icon while others show "play".
   String? _currentlyPlayingPath;
   StreamSubscription<void>? _playbackCompleteSub;
 
   @override
   void initState() {
     super.initState();
-    // Reset the play icon back to normal once a note finishes on its own.
     _playbackCompleteSub = RecorderService.onPlaybackComplete.listen((_) {
       if (mounted) {
         setState(() => _currentlyPlayingPath = null);
@@ -50,13 +44,14 @@ class _VaultScreenState extends State<VaultScreen> {
 
   Future<void> _togglePlayback(String path) async {
     if (_currentlyPlayingPath == path) {
-      // Already playing this one — stop it.
       await RecorderService.stopPlayback();
+      if (!mounted) return; // CHANGED: guards the setState below
       setState(() => _currentlyPlayingPath = null);
       return;
     }
 
     final started = await RecorderService.playRecording(path);
+    if (!mounted) return; // CHANGED: guards the context use below
     if (started) {
       setState(() => _currentlyPlayingPath = path);
     } else {
@@ -149,7 +144,7 @@ class _VaultScreenState extends State<VaultScreen> {
   void _showAddMnemonicDialog(BuildContext context) {
     final wordController = TextEditingController();
     final noteController = TextEditingController();
-    _lastRecordedPath = null; // reset any leftover recording from a previous dialog
+    _lastRecordedPath = null;
 
     showDialog(
       context: context,
@@ -172,8 +167,6 @@ class _VaultScreenState extends State<VaultScreen> {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 12),
-                // Voice recording button — starts/stops recording only.
-                // Saving the mnemonic itself happens via the Save button below.
                 ElevatedButton.icon(
                   icon: Icon(_isRecording ? Icons.stop : Icons.mic),
                   label: Text(_isRecording ? 'Stop Recording' : 'Record Voice Mnemonic'),
@@ -181,14 +174,12 @@ class _VaultScreenState extends State<VaultScreen> {
                     if (!_isRecording) {
                       final path = await RecorderService.startRecording(
                           wordController.text.isEmpty ? 'temp' : wordController.text);
+                      if (!mounted) return; // CHANGED
                       if (path != null) {
                         setDialogState(() {
                           _isRecording = true;
-                          _currentRecordingWord = wordController.text;
                         });
                       } else {
-                        // Either permission was denied, or (more likely right now)
-                        // we're running on Web preview where recording isn't supported.
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
@@ -198,6 +189,7 @@ class _VaultScreenState extends State<VaultScreen> {
                       }
                     } else {
                       final finishedPath = await RecorderService.stopRecording();
+                      if (!mounted) return; // CHANGED
                       setDialogState(() {
                         _isRecording = false;
                         _lastRecordedPath = finishedPath;
@@ -227,7 +219,7 @@ class _VaultScreenState extends State<VaultScreen> {
                 );
                 await StorageService.mnemonicBox.add(mnemonic);
 
-                setState(() {}); // refresh the Vault list
+                setState(() {});
                 Navigator.pop(dialogContext);
               },
               child: const Text('Save'),
