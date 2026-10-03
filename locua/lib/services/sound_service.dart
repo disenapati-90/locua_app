@@ -1,22 +1,25 @@
 // sound_service.dart
 // Plays short UI feedback for the word-check flow and Quick Quiz.
 //
-// CHANGED: correct/incorrect feedback now uses actual SPEECH ("Correct!"
-// / "Not quite") via a dedicated FlutterTts instance, instead of a
-// synthesized tone — testing showed the tones read as unclear/odd for
-// pass/fail feedback specifically. The TAP sound (choosing an answer)
-// still uses the original synthesized-tone approach across all 3 sound
-// packs, since that one's just a tactile click and worked fine.
+// CHANGED this session: all 3 tap-sound packs rebuilt. The old packs were
+// single-frequency sine tones with a straight linear fade — inherently
+// harsh/artificial-sounding, per user feedback. Rebuilt with layered
+// harmonics (2-3 overtones per sound) and natural exponential decay
+// instead of a linear fade, which is much closer to how real short sounds
+// actually decay. New packs: Keypad Tap (soft mechanical click), Water
+// Drop (pitch glide + overtone, bubble-like), Soft Bell (3-harmonic chime
+// with a slow natural decay).
 //
-// This uses its OWN FlutterTts instance, separate from tts_service.dart's
-// instance — deliberately does NOT use the user's chosen word-pronunciation
-// accent/rate from Settings, since "Correct!"/"Not quite" is app feedback,
-// not word pronunciation, and should sound consistent regardless of which
-// accent the user picked for hearing vocabulary words.
+// NOTE: AppMeta.soundPack stores the pack as a plain string ('chime',
+// 'pop', 'deep' previously). Renaming the enum values means any existing
+// install with an old saved pack name will safely fall back to the new
+// default (keypadTap) via packFromName's orElse — not a crash, just a
+// silent reset to default for anyone who'd previously picked a non-default
+// pack. Acceptable since this is a cosmetic preference, not data loss.
 //
-// Gated by the same "Sound Effects" toggle as the tap sound (AppMeta.
-// soundEnabled) — NOT the separate Voice/TTS toggle, since this is UI
-// feedback rather than word-pronunciation speech.
+// Correct/incorrect feedback still uses real SPEECH via a dedicated
+// FlutterTts instance (unchanged from before) — only the tap-sound
+// synthesis changed in this pass.
 
 import 'dart:typed_data';
 import 'dart:math' as math;
@@ -24,7 +27,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'storage_service.dart';
 
-enum SoundPack { chime, pop, deep }
+enum SoundPack { keypadTap, waterDrop, softBell }
 
 class SoundService {
   static final AudioPlayer _player = AudioPlayer();
@@ -34,19 +37,19 @@ class SoundService {
   static SoundPack packFromName(String name) {
     return SoundPack.values.firstWhere(
       (p) => p.name == name,
-      orElse: () => SoundPack.chime,
+      orElse: () => SoundPack.keypadTap,
     );
   }
 
-  /// Plays the tap sound — a short synthesized tone, still respects the
-  /// user's chosen sound pack.
+  /// Plays the tap sound — now a layered, naturally-decaying tone rather
+  /// than a flat sine blip. Still respects the user's chosen pack.
   static Future<void> playTap() async {
     final meta = StorageService.getOrCreateAppMeta();
     if (!meta.soundEnabled) return;
 
     final pack = packFromName(meta.soundPack);
-    final spec = _tapSpecFor(pack);
-    final bytes = _generateTone(frequency: spec.frequency, durationMs: spec.durationMs);
+    final spec = _specFor(pack);
+    final bytes = _generateTone(spec);
 
     try {
       await _player.play(BytesSource(bytes));
@@ -55,11 +58,7 @@ class SoundService {
     }
   }
 
-  /// Speaks "Correct!" aloud. Call this alongside your existing confetti
-  /// trigger — this only handles the audio side.
   static Future<void> playCorrect() => _speakFeedback('Correct!');
-
-  /// Speaks "Not quite" aloud.
   static Future<void> playIncorrect() => _speakFeedback('Not quite');
 
   static Future<void> _speakFeedback(String phrase) async {
@@ -79,35 +78,81 @@ class SoundService {
     }
   }
 
-  static _ToneSpec _tapSpecFor(SoundPack pack) {
-    return switch (pack) {
-      SoundPack.chime => const _ToneSpec(880, 70),
-      SoundPack.pop => const _ToneSpec(660, 40),
-      SoundPack.deep => const _ToneSpec(330, 90),
-    };
+  // CHANGED: each pack is now a short list of harmonic partials (frequency
+  // + relative volume) rather than a single frequency, plus an optional
+  // downward pitch glide for Water Drop.
+  static _ToneSpec _specFor(SoundPack pack) {
+    switch (pack) {
+      case SoundPack.keypadTap:
+        // Soft mechanical click: a quiet low thump + a faint high tick,
+        // both very short.
+        return const _ToneSpec(
+          frequencies: [160, 2200],
+          amplitudes: [0.38, 0.10],
+          durationMs: 45,
+        );
+      case SoundPack.waterDrop:
+        // Bubble-like: fundamental glides down in pitch, plus a quiet
+        // overtone at double the (moving) fundamental.
+        return const _ToneSpec(
+          frequencies: [900, 1800],
+          amplitudes: [0.45, 0.12],
+          durationMs: 140,
+          glideToFrequency: 300,
+        );
+      case SoundPack.softBell:
+        // Small chime: fundamental + 2 quieter overtones, slow decay.
+        return const _ToneSpec(
+          frequencies: [600, 1200, 1800],
+          amplitudes: [0.42, 0.18, 0.08],
+          durationMs: 260,
+        );
+    }
   }
 
-  /// Generates a mono 16-bit PCM WAV tone in memory: a pure sine wave at
-  /// [frequency] Hz for [durationMs], with a short linear fade-in/out to
-  /// avoid audible clicks at the start/end of playback.
-  static Uint8List _generateTone({
-    required double frequency,
-    required int durationMs,
-  }) {
+  /// Generates a mono 16-bit PCM WAV in memory from a set of harmonic
+  /// partials, a short attack, and a natural EXPONENTIAL decay (rather
+  /// than the old straight-line fade) — this alone makes a huge
+  /// difference in how "real" a short synthesized sound feels. If
+  /// [glideToFrequency] is set on the spec, the FIRST partial's frequency
+  /// (and any others, scaled proportionally) slides linearly from its
+  /// starting value to that target over the sound's duration.
+  static Uint8List _generateTone(_ToneSpec spec) {
     const sampleRate = 44100;
-    final totalSamples = (sampleRate * durationMs / 1000).round();
-    final fadeSamples = (sampleRate * 0.01).round(); // 10ms fade
+    final totalSamples = (sampleRate * spec.durationMs / 1000).round();
+    final attackSamples = (sampleRate * 0.003).round(); // 3ms soft attack
+    // Decay constant tuned so the envelope falls to ~5% by the end.
+    final decayRate = 3.0 / (spec.durationMs / 1000);
 
     final samples = Int16List(totalSamples);
+    final baseFreq = spec.frequencies.first;
+
     for (var i = 0; i < totalSamples; i++) {
       final t = i / sampleRate;
-      var amplitude = 0.5;
-      if (i < fadeSamples) {
-        amplitude *= i / fadeSamples;
-      } else if (i > totalSamples - fadeSamples) {
-        amplitude *= (totalSamples - i) / fadeSamples;
+      final progress = i / totalSamples;
+
+      // Attack: quick linear ramp up. Decay: exponential, natural-sounding.
+      double envelope = math.exp(-decayRate * t);
+      if (i < attackSamples) {
+        envelope *= i / attackSamples;
       }
-      final sample = amplitude * math.sin(2 * math.pi * frequency * t);
+
+      // Instantaneous fundamental frequency — glides linearly toward
+      // glideToFrequency if the spec asks for it.
+      final instantFund = spec.glideToFrequency != null
+          ? baseFreq + (spec.glideToFrequency! - baseFreq) * progress
+          : baseFreq;
+
+      double sample = 0;
+      for (var p = 0; p < spec.frequencies.length; p++) {
+        // Each partial keeps its original ratio to the fundamental, so
+        // overtones glide along with the fundamental too.
+        final ratio = spec.frequencies[p] / baseFreq;
+        final freq = instantFund * ratio;
+        sample += spec.amplitudes[p] * math.sin(2 * math.pi * freq * t);
+      }
+      sample *= envelope;
+
       samples[i] = (sample * 32767).round().clamp(-32768, 32767);
     }
 
@@ -146,7 +191,14 @@ class SoundService {
 }
 
 class _ToneSpec {
-  final double frequency;
+  final List<double> frequencies;
+  final List<double> amplitudes;
   final int durationMs;
-  const _ToneSpec(this.frequency, this.durationMs);
+  final double? glideToFrequency;
+  const _ToneSpec({
+    required this.frequencies,
+    required this.amplitudes,
+    required this.durationMs,
+    this.glideToFrequency,
+  });
 }

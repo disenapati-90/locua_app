@@ -1,6 +1,6 @@
 // settings_screen.dart
-// Real Settings screen: profile name (added this session), theme switcher,
-// daily reminder, sound effects, and the stats dashboard.
+// Real Settings screen: profile name, theme switcher, daily reminder,
+// sound effects, and the stats dashboard.
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -28,8 +28,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _appMeta = StorageService.getOrCreateAppMeta();
   }
 
-  // ADDED this session: lets the user rename themselves after the
-  // one-time onboarding, via a simple dialog.
   Future<void> _editName() async {
     final controller = TextEditingController(text: _appMeta.userName);
     final result = await showDialog<String>(
@@ -136,11 +134,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     SoundService.playTap();
   }
 
+  // CHANGED: labels match the renamed enum values.
   String _soundPackLabel(SoundPack pack) {
     return switch (pack) {
-      SoundPack.chime => 'Soft Chime',
-      SoundPack.pop => 'Gentle Pop',
-      SoundPack.deep => 'Deep Tone',
+      SoundPack.keypadTap => 'Keypad Tap',
+      SoundPack.waterDrop => 'Water Drop',
+      SoundPack.softBell => 'Soft Bell',
     };
   }
 
@@ -155,7 +154,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Text('Settings', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
 
-        // ADDED this session: profile card.
         Card(
           child: ListTile(
             leading: const Icon(Icons.person_outline),
