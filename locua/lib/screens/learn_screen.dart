@@ -1,12 +1,17 @@
 // learn_screen.dart
 // Restructured Learn screen: 3-level flow (theme grid -> episode list ->
-// reader). CHANGED this session: now actually consumes NavProvider's
-// pendingTheme/themeRequestId — this was always missing in every version
-// built this session, which is the full root cause of Home's theme cards
-// never deep-linking correctly. Also caches the word-bank Future in
-// initState instead of reloading it every build, since watching
-// NavProvider now means this screen rebuilds on every tab switch
-// app-wide (IndexedStack keeps it mounted), not just when it's visible.
+// reader). Consumes NavProvider's pendingTheme/themeRequestId for Home's
+// deep-links. Caches the word-bank Future in initState instead of
+// reloading it every build, since watching NavProvider means this screen
+// rebuilds on every tab switch app-wide (IndexedStack keeps it mounted).
+//
+// CHANGED this session: registers a stepBack() handler with
+// BackHandlerRegistry (tab index 1), which Origins already did but Learn
+// never did — this was the actual cause of the hardware back button
+// jumping straight to the exit-confirmation dialog on the Learn tab
+// instead of stepping reader->episodes->themes first. _goBack() (used by
+// the on-screen back arrow) and the new _stepBack() (used by the
+// registry) now share the same step-down logic.
 
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -17,6 +22,7 @@ import '../services/word_service.dart';
 import '../providers/nav_provider.dart';
 import '../providers/progress_provider.dart';
 import '../widgets/word_check_sheet.dart';
+import '../widgets/back_handler_registry.dart';
 
 class _Episode {
   final String theme;
@@ -85,6 +91,10 @@ class LearnScreen extends StatefulWidget {
 }
 
 class _LearnScreenState extends State<LearnScreen> {
+  // ADDED: Learn is bottom-nav tab index 1 (Home=0, Learn=1, Practice=2,
+  // Origins=3, Vault=4, Settings=5) — must match MainShell's order.
+  static const int _tabIndex = 1;
+
   _Level _nav = _Level.themes;
   _Theme? _activeTheme;
   _Episode? _activeEpisode;
@@ -92,17 +102,26 @@ class _LearnScreenState extends State<LearnScreen> {
   bool _devMode = false;
   List<Word> _allWordsCache = [];
 
-  // ADDED: cached future (was recreated every build before).
   late Future<List<Word>> _wordsFuture;
 
-  // ADDED: tracks the last-handled deep-link request so we don't replay
-  // the same jump on every subsequent rebuild.
   int _lastHandledThemeRequestId = -1;
 
   @override
   void initState() {
     super.initState();
+    // ADDED: register this screen's step-back logic so the app-wide
+    // back button steps reader->episodes->themes before ever reaching
+    // the exit-confirmation dialog.
+    BackHandlerRegistry.register(_tabIndex, _stepBack);
     _wordsFuture = WordService.loadWords();
+  }
+
+  @override
+  void dispose() {
+    // ADDED: mirrors OriginsScreen — always unregister so a stale
+    // handler can't linger after this screen is gone.
+    BackHandlerRegistry.unregister(_tabIndex);
+    super.dispose();
   }
 
   List<_Theme> _buildThemes(List<Word> words) {
@@ -137,6 +156,8 @@ class _LearnScreenState extends State<LearnScreen> {
     });
   }
 
+  /// Used by the on-screen back arrow (AppBar-style). Unconditionally
+  /// steps down one level; does nothing if already at the top.
   void _goBack() {
     setState(() {
       if (_nav == _Level.reader) {
@@ -148,6 +169,29 @@ class _LearnScreenState extends State<LearnScreen> {
         _activeTheme = null;
       }
     });
+  }
+
+  /// ADDED: used by BackHandlerRegistry for the hardware/gesture back
+  /// button. Same step-down logic as _goBack(), but reports whether it
+  /// actually stepped back (true) or was already at the top level with
+  /// nothing further to step back through (false) — MainShell uses that
+  /// return value to decide whether to show the exit-confirmation dialog.
+  bool _stepBack() {
+    if (_nav == _Level.reader) {
+      setState(() {
+        _nav = _Level.episodes;
+        _activeEpisode = null;
+        _revealedInOrder.clear();
+      });
+      return true;
+    } else if (_nav == _Level.episodes) {
+      setState(() {
+        _nav = _Level.themes;
+        _activeTheme = null;
+      });
+      return true;
+    }
+    return false;
   }
 
   List<String> _pickDistractors(Word current) {
@@ -200,8 +244,6 @@ class _LearnScreenState extends State<LearnScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ADDED: watch NavProvider so an incoming deep-link request triggers
-    // a rebuild here even while this tab isn't the visible one.
     final navProvider = context.watch<NavProvider>();
 
     return FutureBuilder<List<Word>>(
@@ -213,10 +255,6 @@ class _LearnScreenState extends State<LearnScreen> {
         _allWordsCache = snapshot.data!;
         final themes = _buildThemes(snapshot.data!);
 
-        // ADDED: consume Home's pending theme deep-link. If a new request
-        // (by id, not just by name — a repeat tap on the same theme still
-        // counts as new) is waiting, jump straight to that theme's
-        // episode list instead of landing on the L1 grid.
         if (navProvider.pendingTheme != null &&
             navProvider.themeRequestId != _lastHandledThemeRequestId) {
           _lastHandledThemeRequestId = navProvider.themeRequestId;

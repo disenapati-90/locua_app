@@ -1,6 +1,11 @@
 // settings_screen.dart
 // Real Settings screen: profile name, theme switcher, daily reminder,
 // sound effects, and the stats dashboard.
+//
+// CHANGED this session: _soundPackLabel extended with labels for the 2
+// new ASMR-derived packs (Soft Tones, Water Chimes) added to
+// sound_service.dart. The pack picker itself needed no other change —
+// it already builds its chips dynamically from SoundPack.values.
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -134,12 +139,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     SoundService.playTap();
   }
 
-  // CHANGED: labels match the renamed enum values.
+  // CHANGED: added labels for the 2 new ASMR-derived packs.
   String _soundPackLabel(SoundPack pack) {
     return switch (pack) {
       SoundPack.keypadTap => 'Keypad Tap',
       SoundPack.waterDrop => 'Water Drop',
       SoundPack.softBell => 'Soft Bell',
+      SoundPack.softTones => 'Soft Tones',
+      SoundPack.waterChimes => 'Water Chimes',
     };
   }
 

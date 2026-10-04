@@ -15,6 +15,19 @@
 // time) instead of relying solely on the one attempt made at cold start.
 // Failures here are no longer swallowed — they propagate so the caller
 // (Settings) can show the user something actionable.
+//
+// CHANGED (this fix): root cause of "Couldn't set up reminders" found.
+// flutter_timezone can return a deprecated/legacy IANA name on some real
+// devices (e.g. "Asia/Calcutta" instead of the current "Asia/Kolkata" —
+// both are the same zone, but Android's underlying ICU data still reports
+// the old name on some OEM builds). The bundled `timezone` Dart package
+// database does not always include these legacy aliases, so
+// tz.getLocation() throws "could not find a time zone" — this exception
+// was happening BEFORE any permission dialog, which is why the error
+// appeared instantly with no system prompt shown. Fixed by normalizing a
+// short list of known legacy/renamed zone identifiers to their current
+// name before the lookup, with a safe UTC fallback if the name is still
+// unrecognized rather than letting the whole init fail.
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -30,6 +43,23 @@ class NotificationService {
 
   static bool _initialized = false;
   static Future<void>? _initFuture;
+
+  /// Some Android/ICU builds still report a deprecated IANA zone name.
+  /// The `timezone` package's bundled database doesn't always carry these
+  /// old aliases, so a direct tz.getLocation() lookup can throw even
+  /// though the zone is perfectly valid. Map the ones we know about to
+  /// their current name before looking up.
+  static const Map<String, String> _legacyZoneAliases = {
+    'Asia/Calcutta': 'Asia/Kolkata',
+    'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+    'Asia/Rangoon': 'Asia/Yangon',
+    'Asia/Katmandu': 'Asia/Kathmandu',
+    'Asia/Dacca': 'Asia/Dhaka',
+    'Asia/Macao': 'Asia/Macau',
+    'America/Indianapolis': 'America/Indiana/Indianapolis',
+    'Pacific/Ponape': 'Pacific/Pohnpei',
+    'Pacific/Truk': 'Pacific/Chuuk',
+  };
 
   /// Call once at app startup (main.dart). Kept as a thin wrapper around
   /// ensureInit() so main.dart's existing try/catch + timeout doesn't need
@@ -56,10 +86,33 @@ class NotificationService {
     });
   }
 
+  /// Resolves a timezone location robustly: tries the name as-is, then a
+  /// known legacy-alias mapping, then falls back to UTC rather than
+  /// letting the whole notification feature fail over a timezone lookup.
+  /// Falling back to UTC means scheduled times may be off until the next
+  /// successful lookup — acceptable, since "reminders work but may need a
+  /// retry to get the exact local time right" is a much smaller problem
+  /// than "reminders don't work at all."
+  static tz.Location _resolveLocation(String locationName) {
+    try {
+      return tz.getLocation(locationName);
+    } catch (_) {
+      final mapped = _legacyZoneAliases[locationName];
+      if (mapped != null) {
+        try {
+          return tz.getLocation(mapped);
+        } catch (_) {
+          // fall through to UTC below
+        }
+      }
+      return tz.getLocation('UTC');
+    }
+  }
+
   static Future<void> _doInit() async {
     tz_data.initializeTimeZones();
     final locationName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(locationName));
+    tz.setLocalLocation(_resolveLocation(locationName));
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();

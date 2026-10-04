@@ -1,25 +1,35 @@
 // sound_service.dart
 // Plays short UI feedback for the word-check flow and Quick Quiz.
 //
-// CHANGED this session: all 3 tap-sound packs rebuilt. The old packs were
-// single-frequency sine tones with a straight linear fade — inherently
-// harsh/artificial-sounding, per user feedback. Rebuilt with layered
-// harmonics (2-3 overtones per sound) and natural exponential decay
-// instead of a linear fade, which is much closer to how real short sounds
-// actually decay. New packs: Keypad Tap (soft mechanical click), Water
-// Drop (pitch glide + overtone, bubble-like), Soft Bell (3-harmonic chime
-// with a slow natural decay).
+// CHANGED this session: added 2 more tap-sound packs, ported from
+// KiddoSpark's Web Audio API "ASMR" sound themes (asmr1/asmr2), which the
+// user specifically liked on that app:
+//   - Soft Tones: a single pure sine tone, no harmonics — the purest/
+//     softest option, distinct from the 3 existing harmonic-layered packs.
+//   - Water Chimes: a staggered 3-note ascending arpeggio (ported from
+//     KiddoSpark's asmr2 "candy_drop" sound: 3 sine notes ~60ms apart,
+//     rising in pitch) — this is the one that actually reads as a water
+//     chime rather than a single blip.
+// These needed a new rendering path (_generateSequence) since the
+// existing _generateTone only supports simultaneous harmonic partials
+// sharing one envelope, not notes that start at different times within
+// the same clip.
 //
-// NOTE: AppMeta.soundPack stores the pack as a plain string ('chime',
-// 'pop', 'deep' previously). Renaming the enum values means any existing
-// install with an old saved pack name will safely fall back to the new
+// Previous packs (unchanged): all 3 tap-sound packs below were rebuilt
+// last session with layered harmonics (2-3 overtones per sound) and
+// natural exponential decay instead of a linear fade — much closer to
+// how real short sounds actually decay. Packs: Keypad Tap (soft
+// mechanical click), Water Drop (pitch glide + overtone, bubble-like),
+// Soft Bell (3-harmonic chime with a slow natural decay).
+//
+// NOTE: AppMeta.soundPack stores the pack as a plain string. Any
+// existing install with an old/unknown saved pack name falls back to the
 // default (keypadTap) via packFromName's orElse — not a crash, just a
-// silent reset to default for anyone who'd previously picked a non-default
-// pack. Acceptable since this is a cosmetic preference, not data loss.
+// silent reset to default for that one preference.
 //
 // Correct/incorrect feedback still uses real SPEECH via a dedicated
-// FlutterTts instance (unchanged from before) — only the tap-sound
-// synthesis changed in this pass.
+// FlutterTts instance (unchanged) — only tap-sound synthesis is covered
+// here.
 
 import 'dart:typed_data';
 import 'dart:math' as math;
@@ -27,7 +37,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'storage_service.dart';
 
-enum SoundPack { keypadTap, waterDrop, softBell }
+enum SoundPack { keypadTap, waterDrop, softBell, softTones, waterChimes }
 
 class SoundService {
   static final AudioPlayer _player = AudioPlayer();
@@ -41,15 +51,21 @@ class SoundService {
     );
   }
 
-  /// Plays the tap sound — now a layered, naturally-decaying tone rather
-  /// than a flat sine blip. Still respects the user's chosen pack.
+  /// Plays the tap sound — layered/naturally-decaying tone, or (for the
+  /// 2 new ASMR-derived packs) a single pure tone or a staggered
+  /// multi-note sequence. Still respects the user's chosen pack.
   static Future<void> playTap() async {
     final meta = StorageService.getOrCreateAppMeta();
     if (!meta.soundEnabled) return;
 
     final pack = packFromName(meta.soundPack);
-    final spec = _specFor(pack);
-    final bytes = _generateTone(spec);
+
+    Uint8List bytes;
+    if (pack == SoundPack.waterChimes) {
+      bytes = _generateSequence(_sequenceFor(pack));
+    } else {
+      bytes = _generateTone(_specFor(pack));
+    }
 
     try {
       await _player.play(BytesSource(bytes));
@@ -78,9 +94,9 @@ class SoundService {
     }
   }
 
-  // CHANGED: each pack is now a short list of harmonic partials (frequency
-  // + relative volume) rather than a single frequency, plus an optional
-  // downward pitch glide for Water Drop.
+  // Each pack (except waterChimes, handled separately below) is a short
+  // list of harmonic partials (frequency + relative volume) rather than
+  // a single frequency, plus an optional downward pitch glide.
   static _ToneSpec _specFor(SoundPack pack) {
     switch (pack) {
       case SoundPack.keypadTap:
@@ -107,16 +123,43 @@ class SoundService {
           amplitudes: [0.42, 0.18, 0.08],
           durationMs: 260,
         );
+      case SoundPack.softTones:
+        // ADDED: ported from KiddoSpark's asmr1 "Soft Tones" theme — a
+        // single pure sine, no harmonics at all. Deliberately the
+        // plainest/softest-sounding option of the 5.
+        return const _ToneSpec(
+          frequencies: [660],
+          amplitudes: [0.34],
+          durationMs: 130,
+        );
+      case SoundPack.waterChimes:
+        // Handled by _generateSequence instead — see playTap(). This
+        // branch is unreachable but kept exhaustive for the switch.
+        return const _ToneSpec(
+          frequencies: [784],
+          amplitudes: [0.3],
+          durationMs: 90,
+        );
     }
+  }
+
+  /// ADDED: the staggered-note sequence for Water Chimes, ported from
+  /// KiddoSpark's asmr2 "Chimes" theme (its candy_drop sound): 3 sine
+  /// notes rising in pitch, each starting ~60ms after the last.
+  static List<_NoteSpec> _sequenceFor(SoundPack pack) {
+    return const [
+      _NoteSpec(frequency: 784, amplitude: 0.30, startMs: 0, durationMs: 90),
+      _NoteSpec(frequency: 988, amplitude: 0.26, startMs: 60, durationMs: 90),
+      _NoteSpec(frequency: 1175, amplitude: 0.22, startMs: 120, durationMs: 100),
+    ];
   }
 
   /// Generates a mono 16-bit PCM WAV in memory from a set of harmonic
   /// partials, a short attack, and a natural EXPONENTIAL decay (rather
-  /// than the old straight-line fade) — this alone makes a huge
-  /// difference in how "real" a short synthesized sound feels. If
-  /// [glideToFrequency] is set on the spec, the FIRST partial's frequency
-  /// (and any others, scaled proportionally) slides linearly from its
-  /// starting value to that target over the sound's duration.
+  /// than a straight-line fade). If [glideToFrequency] is set, the FIRST
+  /// partial's frequency (and others, scaled proportionally) slides
+  /// linearly from its starting value to that target over the sound's
+  /// duration.
   static Uint8List _generateTone(_ToneSpec spec) {
     const sampleRate = 44100;
     final totalSamples = (sampleRate * spec.durationMs / 1000).round();
@@ -131,22 +174,17 @@ class SoundService {
       final t = i / sampleRate;
       final progress = i / totalSamples;
 
-      // Attack: quick linear ramp up. Decay: exponential, natural-sounding.
       double envelope = math.exp(-decayRate * t);
       if (i < attackSamples) {
         envelope *= i / attackSamples;
       }
 
-      // Instantaneous fundamental frequency — glides linearly toward
-      // glideToFrequency if the spec asks for it.
       final instantFund = spec.glideToFrequency != null
           ? baseFreq + (spec.glideToFrequency! - baseFreq) * progress
           : baseFreq;
 
       double sample = 0;
       for (var p = 0; p < spec.frequencies.length; p++) {
-        // Each partial keeps its original ratio to the fundamental, so
-        // overtones glide along with the fundamental too.
         final ratio = spec.frequencies[p] / baseFreq;
         final freq = instantFund * ratio;
         sample += spec.amplitudes[p] * math.sin(2 * math.pi * freq * t);
@@ -154,6 +192,46 @@ class SoundService {
       sample *= envelope;
 
       samples[i] = (sample * 32767).round().clamp(-32768, 32767);
+    }
+
+    return _wavBytes(samples, sampleRate);
+  }
+
+  /// ADDED: renders several notes that start at different times within
+  /// one clip (e.g. an ascending arpeggio), each with its own short
+  /// attack + exponential decay, summed together into a single buffer.
+  static Uint8List _generateSequence(List<_NoteSpec> notes) {
+    const sampleRate = 44100;
+    final totalDurationMs = notes
+        .map((n) => n.startMs + n.durationMs)
+        .reduce((a, b) => a > b ? a : b) + 40; // small tail so the last note doesn't click off
+    final totalSamples = (sampleRate * totalDurationMs / 1000).round();
+    final samples = Int16List(totalSamples);
+    final buffer = List<double>.filled(totalSamples, 0);
+
+    for (final note in notes) {
+      final startSample = (sampleRate * note.startMs / 1000).round();
+      final noteSamples = (sampleRate * note.durationMs / 1000).round();
+      final attackSamples = (sampleRate * 0.004).round(); // 4ms soft attack
+      final decayRate = 3.0 / (note.durationMs / 1000);
+
+      for (var i = 0; i < noteSamples; i++) {
+        final globalIndex = startSample + i;
+        if (globalIndex >= totalSamples) break;
+        final t = i / sampleRate;
+
+        double envelope = math.exp(-decayRate * t);
+        if (i < attackSamples) {
+          envelope *= i / attackSamples;
+        }
+
+        final sample = note.amplitude * math.sin(2 * math.pi * note.frequency * t) * envelope;
+        buffer[globalIndex] += sample;
+      }
+    }
+
+    for (var i = 0; i < totalSamples; i++) {
+      samples[i] = (buffer[i] * 32767).round().clamp(-32768, 32767);
     }
 
     return _wavBytes(samples, sampleRate);
@@ -200,5 +278,20 @@ class _ToneSpec {
     required this.amplitudes,
     required this.durationMs,
     this.glideToFrequency,
+  });
+}
+
+/// ADDED: one note within a staggered multi-note sequence (see
+/// _generateSequence / Water Chimes).
+class _NoteSpec {
+  final double frequency;
+  final double amplitude;
+  final int startMs;
+  final int durationMs;
+  const _NoteSpec({
+    required this.frequency,
+    required this.amplitude,
+    required this.startMs,
+    required this.durationMs,
   });
 }
